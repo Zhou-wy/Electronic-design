@@ -1,0 +1,69 @@
+#include "Control.h"
+#include "stdio.h"
+#include "math.h"
+PID *Hight_Pid; 
+PID *Speed_Pid; 
+PID *Pose_Pid;   //沿杆方向角度PID
+PID *Turn_Pid;   //自旋PID
+//PID *Acc_Pid;    //加速度PID
+
+void Control_Init()
+{
+    Hight_Pid=PID_Init(0,0,0,0);
+    Pose_Pid =PID_Init(0,0,0,0); 
+    Speed_Pid=PID_Init(0,0,0,0); 
+    Turn_Pid= PID_Init(0,10,0,10); 
+}
+
+static float Speed_H,Speed_A,Speed;
+void Speed_Measure()                            //速度测量(融合滤波)
+{
+    Speed_H=(Hight.Now-Hight.Last)/Count_T;
+    Speed_A+=(Fly_Pose.Z_a-1) *9.8 /1000 * Count_T;
+    Speed=Speed_H*0.6+Speed_A*0.4;  
+    printf("Speed:%f\r\n",Speed);  
+     printf("W:%f\n\r",Fly_Pose.Z_a);      
+}
+
+void Inner_PID_Count()//内环 速度环
+{
+    PID_Count(Speed_Pid ,PID_Proportion(Hight_Pid)-Speed); 
+}
+
+void Inner_PID_Output()//内环 一次输出
+{
+    float Pid_output=PID_Proportion(Speed_Pid);
+    if(Pid_output>100) 
+        Pid_output=100; 
+    if(Pid_output<0)
+        Pid_output=0;
+    Set_Motor1_Speed(Pid_output);  
+    Set_Motor2_Speed(Pid_output);  
+}
+
+void Outer_PID_Count()//外环 高度环
+{
+    PID_Count(Hight_Pid ,Hight.Now);  
+}
+
+void Turn_Pid_Count()  //自旋PID控制计算
+{
+    PID_Count(Turn_Pid ,Fly_Pose.Z_w);
+}
+
+
+void Turn_Pid_Contorl() 
+{
+    float Pid_output=PID_Proportion(Turn_Pid);
+    //printf("%f\r\n",Pid_output);
+    if(Pid_output>66)
+        Pid_output=66;
+    if(Pid_output<-66)
+        Pid_output=-66;
+    TIM_SetCompare3(TIM1,(u16)(1500.0+Pid_output)); 
+    TIM_SetCompare4(TIM1,(u16)(1500.0+Pid_output));   
+}
+
+    
+
+
